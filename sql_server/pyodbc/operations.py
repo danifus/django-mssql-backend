@@ -43,12 +43,15 @@ class DatabaseOperations(BaseDatabaseOperations):
         are the fields going to be inserted in the batch, the objs contains
         all the objects to be inserted.
         """
-        objs_len, fields_len, max_row_values = len(objs), len(fields), 1000
-        if (objs_len * fields_len) <= max_row_values:
-            size = objs_len
-        else:
-            size = max_row_values // fields_len
-        return size
+        fields_len = len(fields)
+        # MSSQL allows a query to have 2100 parameters but some parameters are
+        # taken up defining `NVARCHAR` parameters to store the query text and
+        # query parameters for the `sp_executesql` call. This should only take
+        # up 2 parameters but I've had this error when sending 2098 parameters.
+        max_query_params = 2050
+        # inserts are capped at 1000 rows. Other operations do not have this
+        # limit.
+        return min(1000, max_query_params // fields_len)
 
     def bulk_insert_sql(self, fields, placeholder_rows):
         placeholder_rows_sql = (", ".join(row) for row in placeholder_rows)
